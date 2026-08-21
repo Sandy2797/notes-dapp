@@ -1,0 +1,27 @@
+# Frontend dependencies
+frontend/node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# Motoko package/cache
+.mops/
+
+# Backend build output
+backend/target/
+
+# Generic build outputs
+build/
+
+# Local identity material - never commit
+*.seed
+*.secret.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local backup files
+*.backup
+*.save

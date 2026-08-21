@@ -1,0 +1,23 @@
+[project]
+name = "notes-dapp"
+default_network = "wan-experimental"
+chain_id = 2026
+
+[networks.wan-experimental]
+gateway = "https://memphis.mercaturaforum.com"
+validators = []
+routing = "smart"
+
+[canisters.backend]
+type = "backend-motoko"
+cid = 92459100095509
+wasm = "build/backend.wasm"
+build = "mops install && mkdir -p build && moc $(mops sources) -o build/backend.wasm backend/Backend.mo"
+
+[canisters.frontend]
+type = "frontend"
+cid = 48733158182532
+wasm = "frontend/asset_canister.wasm"
+build = "cd frontend && npm install && npm run build"
+bundle = "frontend/dist"
+health_check_url = "/index.html"

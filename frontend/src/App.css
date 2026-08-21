@@ -1,0 +1,225 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #f4f7fb;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: none;
+  cursor: pointer;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 48px 20px;
+}
+
+header {
+  width: min(100%, 1050px);
+  margin: 0 auto 32px;
+}
+
+header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  color: #172033;
+}
+
+header p {
+  margin: 0;
+  font-size: 1rem;
+  color: #687086;
+}
+
+main {
+  width: min(100%, 1050px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.editor,
+.notes {
+  background: #ffffff;
+  border: 1px solid #e4e8f0;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(23, 32, 51, 0.06);
+}
+
+.editor {
+  padding: 28px;
+  position: sticky;
+  top: 24px;
+}
+
+.notes {
+  padding: 28px;
+  min-height: 400px;
+}
+
+h2 {
+  margin: 0 0 22px;
+  font-size: 1.25rem;
+  color: #172033;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid #dce1ea;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #172033;
+  outline: none;
+  padding: 13px 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input {
+  margin-bottom: 14px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 150px;
+  line-height: 1.55;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9aa3b2;
+}
+
+input:focus,
+textarea:focus {
+  border-color: #5b6cff;
+  box-shadow: 0 0 0 3px rgba(91, 108, 255, 0.12);
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.buttons button,
+.notes-header button {
+  padding: 11px 16px;
+  border-radius: 9px;
+  background: #5b6cff;
+  color: white;
+  font-weight: 600;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.buttons button:hover,
+.notes-header button:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none !important;
+}
+
+.message {
+  margin: 16px 0 0;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: #f1f3ff;
+  color: #4655d9;
+  font-size: 0.9rem;
+}
+
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.notes-header h2 {
+  margin: 0;
+}
+
+.note-list {
+  display: grid;
+  gap: 14px;
+}
+
+.note-card {
+  padding: 20px;
+  border: 1px solid #e6e9ef;
+  border-radius: 14px;
+  background: #fafbfe;
+}
+
+.note-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  color: #172033;
+}
+
+.note-card p {
+  margin: 0;
+  color: #5f6878;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.note-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.note-actions button {
+  padding: 8px 13px;
+  border-radius: 8px;
+  background: #e9edff;
+  color: #4655d9;
+  font-weight: 600;
+}
+
+.note-actions button:last-child {
+  background: #fff0f1;
+  color: #d84b5c;
+}
+
+@media (max-width: 800px) {
+  .app {
+    padding: 28px 16px;
+  }
+
+  main {
+    grid-template-columns: 1fr;
+  }
+
+  .editor {
+    position: static;
+  }
+}
