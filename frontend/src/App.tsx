@@ -106,47 +106,87 @@ function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>Notes dApp</h1>
-        <p>Simple on-chain notes on Thebes</p>
-      </header>
+      <header className="app-header">
+  <div className="brand">
+    <div className="brand-mark">N</div>
 
+    <div>
+      <div className="brand-name">NOTES</div>
+      <p>On-chain notes powered by Thebes</p>
+    </div>
+  </div>
+
+  <div className="network-status">
+    <span className="status-dot" />
+    <span>On-chain</span>
+  </div>
+</header>
       <main>
-        <section className="editor">
-          <h2>{editingId === null ? "Create a Note" : "Edit Note"}</h2>
+        <section className={`editor ${editingId !== null ? "is-editing" : ""}`}>
+  <div className="editor-heading">
+    <div className="editor-icon">
+      {editingId === null ? "+" : "✎"}
+    </div>
 
-          <input
-            type="text"
-            placeholder="Note title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+    <div>
+      <h2>
+        {editingId === null ? "Create a Note" : "Edit Note"}
+      </h2>
 
-          <textarea
-            placeholder="Write your note..."
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={6}
-          />
+      <p>
+        {editingId === null
+          ? "Store your thoughts securely on-chain."
+          : "Update your existing on-chain note."}
+      </p>
+    </div>
+  </div>
 
-          <div className="buttons">
-            <button onClick={saveNote} disabled={loading}>
-              {loading
-                ? "Saving..."
-                : editingId === null
-                ? "Add Note"
-                : "Save Changes"}
-            </button>
+  <div className="field">
+    <label htmlFor="note-title">Title</label>
 
-            {editingId !== null && (
-              <button onClick={cancelEdit} disabled={loading}>
-                Cancel
-              </button>
-            )}
-          </div>
+    <input
+      id="note-title"
+      type="text"
+      placeholder="Give your note a title..."
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+    />
+  </div>
 
-          {message && <p className="message">{message}</p>}
-        </section>
+  <div className="field">
+    <label htmlFor="note-content">Content</label>
+
+    <textarea
+      id="note-content"
+      placeholder="Write something worth remembering..."
+      value={content}
+      onChange={(e) => setContent(e.target.value)}
+      rows={7}
+    />
+  </div>
+
+  <div className="buttons">
+    <button className="primary-action" onClick={saveNote} disabled={loading}>
+      {loading
+        ? "Saving..."
+        : editingId === null
+        ? "Save on-chain"
+        : "Save Changes"}
+    </button>
+
+    {editingId !== null && (
+      <button
+        className="secondary-action"
+        onClick={cancelEdit}
+        disabled={loading}
+      >
+        Cancel
+      </button>
+    )}
+  </div>
+
+  {message && <p className="message">{message}</p>}
+</section>
 
         <section className="notes">
           <div className="notes-header">
