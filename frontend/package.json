@@ -4,12 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "npm run sync-sdk && vite",
+    "build": "npm run sync-sdk && tsc && vite build",
+    "preview": "vite preview",
+    "sync-sdk": "./sync-sdk.sh"
   },
   "dependencies": {
     "@icp-sdk/core": "^6.1.0",
+    "@thebes/sdk": "github:Mercatura-Forum/thebes-sdk#v0.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
