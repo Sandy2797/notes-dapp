@@ -1,40 +1,54 @@
-import { decodeVecRecord, encodeArgs, query as boundaryQuery, update as boundaryUpdate } from '@thebes/sdk';
+import {
+  decodeVecRecord,
+  encodeArgs,
+  identity as boundaryIdentity,
+  update as boundaryUpdate,
+} from "@thebes/sdk";
 
 export const BACKEND_CANISTER_ID = 92459100095509;
 
 export type Note = { id: bigint; title: string; content: string };
 
-export function encodeNoteArgs(token: string, ...values: unknown[]): string {
-  return encodeArgs([token, ...values]);
+function ensureSuccess(response: { status?: string; reply_hex?: string; error?: string }, fallback: string) {
+  if (response.status !== "success" || !response.reply_hex) {
+    throw new Error(response.error || fallback);
+  }
+  return response.reply_hex;
 }
 
-export async function list(token: string): Promise<Note[]> {
-  const response = await boundaryQuery(BACKEND_CANISTER_ID, 'list', encodeNoteArgs(token));
-  if (response.status !== 'success' || !response.reply_hex) throw new Error(response.error || 'Unable to load notes.');
-  return decodeVecRecord(response.reply_hex, [
-    { name: 'id', type: 'nat' },
-    { name: 'title', type: 'text' },
-    { name: 'content', type: 'text' },
+export function identity() {
+  return boundaryIdentity();
+}
+
+export function encodeAdd(title: string, content: string) {
+  return encodeArgs([title, content]);
+}
+
+export function encodeEdit(id: bigint, title: string, content: string) {
+  return encodeArgs([id, title, content]);
+}
+
+export function encodeRemove(id: bigint) {
+  return encodeArgs([id]);
+}
+
+export async function list(): Promise<Note[]> {
+  const reply = ensureSuccess(
+    await boundaryUpdate(BACKEND_CANISTER_ID, "list", encodeArgs([])),
+    "Unable to load notes.",
+  );
+  return decodeVecRecord(reply, [
+    { name: "id", type: "nat" },
+    { name: "title", type: "text" },
+    { name: "content", type: "text" },
   ]) as Note[];
 }
 
-export async function add(token: string, title: string, content: string): Promise<bigint> {
-  const response = await boundaryUpdate(BACKEND_CANISTER_ID, 'add', encodeNoteArgs(token, title, content));
-  if (response.status !== 'success' || !response.reply_hex) throw new Error(response.error || 'Unable to save note.');
-  const [note] = decodeVecRecord(response.reply_hex, [{ name: 'id', type: 'nat' }]);
-  return note?.id as bigint;
-}
-
-export async function edit(token: string, id: bigint, title: string, content: string): Promise<boolean> {
-  const response = await boundaryUpdate(BACKEND_CANISTER_ID, 'edit', encodeNoteArgs(token, id, title, content));
-  if (response.status !== 'success' || !response.reply_hex) throw new Error(response.error || 'Unable to update note.');
-  return response.reply_hex.length > 0;
-}
-
-export async function remove(token: string, id: bigint): Promise<boolean> {
-  const response = await boundaryUpdate(BACKEND_CANISTER_ID, 'remove', encodeNoteArgs(token, id));
-  if (response.status !== 'success' || !response.reply_hex) throw new Error(response.error || 'Unable to delete note.');
-  return response.reply_hex.length > 0;
+export async function call(method: string, args: string) {
+  return ensureSuccess(
+    await boundaryUpdate(BACKEND_CANISTER_ID, method, args),
+    "The notes operation failed.",
+  );
 }
 
 export { encodeArgs };
