@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@thebes/sdk": "github:Mercatura-Forum/thebes-sdk#v0.1.1"
+  }
+}
