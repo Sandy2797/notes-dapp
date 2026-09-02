@@ -1,17 +1,16 @@
 {
-  "name": "notes-dapp-frontend",
+  "name": "note-d-app-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run sync-sdk && vite",
-    "build": "npm run sync-sdk && tsc && vite build",
-    "preview": "vite preview",
-    "sync-sdk": "./sync-sdk.sh"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@icp-sdk/core": "^6.1.0",
-    "@thebes/sdk": "github:Mercatura-Forum/thebes-sdk#v0.1.1",
+    "@thebes/sdk": "file:vendor/@thebes/sdk",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

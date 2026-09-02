@@ -1,349 +1,178 @@
-import { IDL } from '@icp-sdk/core/candid';
-export const BACKEND_CANISTER_ID = 92459100095509;
+import { IDL } from "@icp-sdk/core/candid";
+import { Principal } from "@icp-sdk/core/principal";
+
+export const BACKEND_CANISTER_ID = 31220421087937;
 
 const BASE = "";
-
-function bytesToHex(b: Uint8Array): string {
-  return Array.from(b, (x) =>
-    x.toString(16).padStart(2, "0")
-  ).join("");
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.length % 2 ? "0" + hex : hex;
-  const out = new Uint8Array(clean.length / 2);
-
-  for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(
-      clean.slice(i * 2, i * 2 + 2),
-      16
-    );
-  }
-
-  return out;
-}
-
-function uleb(n: bigint): number[] {
-  const out: number[] = [];
-
-  for (;;) {
-    const byte = Number(n & 0x7fn);
-    n >>= 7n;
-
-    if (n === 0n) {
-      out.push(byte);
-      return out;
-    }
-
-    out.push(byte | 0x80);
-  }
-}
-
-function ulebDecode(
-  buf: Uint8Array,
-  off: number
-): [bigint, number] {
-  let result = 0n;
-  let shift = 0n;
-
-  for (;;) {
-    const byte = buf[off++];
-
-    if (byte === undefined) {
-      throw new Error("candid: truncated uleb128");
-    }
-
-    result |= BigInt(byte & 0x7f) << shift;
-
-    if ((byte & 0x80) === 0) {
-      return [result, off];
-    }
-
-    shift += 7n;
-  }
-}
-
-function slebDecode(
-  buf: Uint8Array,
-  off: number
-): [bigint, number] {
-  let result = 0n;
-  let shift = 0n;
-
-  for (;;) {
-    const byte = buf[off++];
-
-    if (byte === undefined) {
-      throw new Error("candid: truncated sleb128");
-    }
-
-    result |= BigInt(byte & 0x7f) << shift;
-    shift += 7n;
-
-    if ((byte & 0x80) === 0) {
-      if (byte & 0x40) {
-        result -= 1n << shift;
-      }
-
-      return [result, off];
-    }
-  }
-}
-
-const MAGIC = [0x44, 0x49, 0x44, 0x4c];
-
-const TYPE_TEXT = 0x71;
-const TYPE_NAT = 0x7d;
-
-export function encodeText(text: string): string {
-  const bytes: number[] = [
-    ...MAGIC,
-    0,
-    1,
-    TYPE_TEXT,
-  ];
-
-  encodeTextValue(bytes, text);
-
-  return bytesToHex(new Uint8Array(bytes));
-}
-function encodeTextValue(
-  bytes: number[],
-  value: string
-) {
-  const utf8 = new TextEncoder().encode(value);
-
-  bytes.push(...uleb(BigInt(utf8.length)));
-  bytes.push(...utf8);
-}
-
-function encodeNatValue(
-  bytes: number[],
-  value: bigint
-) {
-  bytes.push(...uleb(value));
-}
-
-export function encodeEmpty(): string {
-  return bytesToHex(
-    new Uint8Array([
-      ...MAGIC,
-      0,
-      0,
-    ])
-  );
-}
-
-export function encodeAdd(
-  title: string,
-  content: string
-): string {
-  const bytes: number[] = [
-    ...MAGIC,
-
-    // Type table count
-    0,
-
-    // Argument count
-    2,
-
-    // text, text
-    TYPE_TEXT,
-    TYPE_TEXT,
-  ];
-
-  encodeTextValue(bytes, title);
-  encodeTextValue(bytes, content);
-
-  return bytesToHex(new Uint8Array(bytes));
-}
-
-export function encodeEdit(
-  id: bigint,
-  title: string,
-  content: string
-): string {
-  const bytes: number[] = [
-    ...MAGIC,
-
-    0,
-
-    // 3 arguments
-    3,
-
-    // nat, text, text
-    TYPE_NAT,
-    TYPE_TEXT,
-    TYPE_TEXT,
-  ];
-
-  encodeNatValue(bytes, id);
-  encodeTextValue(bytes, title);
-  encodeTextValue(bytes, content);
-
-  return bytesToHex(new Uint8Array(bytes));
-}
-
-export function encodeRemove(id: bigint): string {
-  const bytes: number[] = [
-    ...MAGIC,
-    0,
-    1,
-    TYPE_NAT,
-  ];
-
-  encodeNatValue(bytes, id);
-
-  return bytesToHex(new Uint8Array(bytes));
-}
-
-function decodeBool(
-  buf: Uint8Array,
-  off: number
-): boolean {
-  let ty: bigint;
-
-  [ty, off] = slebDecode(buf, off);
-
-  if (ty === -2n) return true;
-  if (ty === -1n) return false;
-
-  throw new Error(
-    `candid: expected bool, got ${ty}`
-  );
-}
-
-function decodeNat(
-  buf: Uint8Array,
-  off: number
-): bigint {
-  let ty: bigint;
-
-  [ty, off] = slebDecode(buf, off);
-
-  if (ty !== -3n) {
-    throw new Error(
-      `candid: expected nat, got ${ty}`
-    );
-  }
-
-  const [value] = ulebDecode(buf, off);
-  return value;
-}
-
-function decodeText(
-  buf: Uint8Array,
-  off: number
-): [string, number] {
-  let ty: bigint;
-
-  [ty, off] = slebDecode(buf, off);
-
-  if (ty !== -15n) {
-    throw new Error(
-      `candid: expected text, got ${ty}`
-    );
-  }
-
-  let length: bigint;
-
-  [length, off] = ulebDecode(buf, off);
-
-  const end = off + Number(length);
-
-  return [
-    new TextDecoder().decode(
-      buf.slice(off, end)
-    ),
-    end,
-  ];
-}
-
-
-function decodeReply(
-  hex: string
-): string | bigint | boolean {
-  const buf = hexToBytes(hex);
-
-  if (
-    buf.length < 6 ||
-    buf[0] !== 0x44 ||
-    buf[1] !== 0x49 ||
-    buf[2] !== 0x44 ||
-    buf[3] !== 0x4c
-  ) {
-    throw new Error("candid: bad magic");
-  }
-
-  let off = 4;
-
-
-  let argCount: bigint;
-  [argCount, off] = ulebDecode(buf, off);
-
-  if (argCount !== 1n) {
-    throw new Error(
-      "candid: expected one return value"
-    );
-  }
-
-  const typePosition = off;
-
-  let ty: bigint;
-  [ty, off] = slebDecode(buf, off);
-
-  switch (ty) {
-    case -3n:
-      return decodeNat( buf, typePosition);
-
-    case -2n:
-    case -1n:
-      return decodeBool(
-        buf,
-        typePosition
-      );
-
-    case -15n: {
-      const [value] = decodeText(
-        buf,
-        typePosition
-      );
-
-      return value;
-    }
-
-    default:
-      throw new Error(
-        `candid: unsupported reply type ${ty}`
-      );
-  }
-}
 
 export type Note = {
   id: bigint;
   title: string;
-  content: string;
+  body: string;
 };
 
-function demoSender(): string {
-  const KEY =
-    `thebes-demo-sender:${BACKEND_CANISTER_ID}`;
+export type FeedNote = {
+  id: bigint;
+  title: string;
+  body: string;
+  author: string;
+};
 
-  let sender =
-    localStorage.getItem(KEY);
+export type TipRecord = {
+  from: string;
+  to: string;
+  amount: bigint;
+  timestamp: bigint;
+};
+
+export type LedgerSeal = {
+  members: bigint;
+  circulation: bigint;
+  expected: bigint;
+  consistent: boolean;
+};
+
+export type TokenMetadata = {
+  name: string;
+  symbol: string;
+  decimals: number;
+  creator: string;
+  totalSupply: bigint;
+};
+
+export type TipResult =
+  | { ok: null }
+  | { err: string };
+
+const NoteIDL = IDL.Record({
+  id: IDL.Nat,
+  title: IDL.Text,
+  body: IDL.Text,
+});
+
+const FeedNoteIDL = IDL.Record({
+  id: IDL.Nat,
+  title: IDL.Text,
+  body: IDL.Text,
+  author: IDL.Principal,
+});
+
+const TipRecordIDL = IDL.Record({
+  from: IDL.Principal,
+  to: IDL.Principal,
+  amount: IDL.Nat,
+  timestamp: IDL.Int,
+});
+
+const LedgerSealIDL = IDL.Record({
+  members: IDL.Nat,
+  circulation: IDL.Nat,
+  expected: IDL.Nat,
+  consistent: IDL.Bool,
+});
+
+const TokenMetadataIDL = IDL.Record({
+  name: IDL.Text,
+  symbol: IDL.Text,
+  decimals: IDL.Nat8,
+  creator: IDL.Text,
+  totalSupply: IDL.Nat,
+});
+
+const TipResultIDL = IDL.Variant({
+  ok: IDL.Null,
+  err: IDL.Text,
+});
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.length % 2 === 0 ? hex : `0${hex}`;
+  const bytes = new Uint8Array(clean.length / 2);
+
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+
+  return bytes;
+}
+
+function encode(types: IDL.Type[], values: unknown[]): string {
+  return bytesToHex(IDL.encode(types, values));
+}
+
+function decode<T>(types: IDL.Type[], hex: string): T {
+  const values = IDL.decode(types, hexToBytes(hex));
+
+  if (values.length !== 1) {
+    throw new Error(
+      `Expected exactly one Candid return value, received ${values.length}`
+    );
+  }
+
+  return values[0] as T;
+}
+
+export function encodeEmpty(): string {
+  return encode([], []);
+}
+
+function sessionBlob(sessionTokenHex: string): Uint8Array {
+  return hexToBytes(sessionTokenHex);
+}
+
+export function encodeCreateNote(title: string, body: string): string {
+  return encode(
+    [IDL.Text, IDL.Text],
+    [title, body]
+  );
+}
+
+export function encodeUpdateNote(
+  id: bigint,
+  title: string,
+  body: string
+): string {
+  return encode(
+    [IDL.Nat, IDL.Text, IDL.Text],
+    [id, title, body]
+  );
+}
+
+export function encodeDeleteNote(id: bigint): string {
+  return encode(
+    [IDL.Nat],
+    [id]
+  );
+}
+
+export function decodeNote(hex: string): Note {
+  return decode<Note>([NoteIDL], hex);
+}
+
+export function decodeNotes(hex: string): Note[] {
+  return decode<Note[]>([IDL.Vec(NoteIDL)], hex);
+}
+
+export function decodeBool(hex: string): boolean {
+  return decode<boolean>([IDL.Bool], hex);
+}
+
+function demoSender(): string {
+  const key = `thebes-demo-sender:${BACKEND_CANISTER_ID}`;
+
+  let sender = localStorage.getItem(key);
 
   if (!sender) {
-    const bytes =
-      new Uint8Array(8);
-
+    const bytes = new Uint8Array(8);
     crypto.getRandomValues(bytes);
 
     sender = bytesToHex(bytes);
-
-    localStorage.setItem(
-      KEY,
-      sender
-    );
+    localStorage.setItem(key, sender);
   }
 
   return sender;
@@ -351,17 +180,12 @@ function demoSender(): string {
 
 const RETRIES = 3;
 
-function isTransient(
-  status: number,
-  body: string
-): boolean {
+function isTransient(status: number, body: string): boolean {
   return (
     status === 502 ||
     status === 503 ||
     status === 504 ||
-    /validator unreachable|no healthy validator|unhealthy/i.test(
-      body
-    )
+    /validator unreachable|no healthy validator|unhealthy/i.test(body)
   );
 }
 
@@ -369,39 +193,25 @@ async function fetchWithRetry(
   url: string,
   init?: RequestInit
 ): Promise<any> {
-  let lastErr = "";
+  let lastError = "";
 
-  for (
-    let attempt = 0;
-    attempt <= RETRIES;
-    attempt++
-  ) {
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
     if (attempt > 0) {
       await new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          400 * attempt
-        )
+        setTimeout(resolve, 400 * attempt)
       );
     }
 
     try {
-      const response =
-        await fetch(url, init);
-
-      const text =
-        await response.text();
+      const response = await fetch(url, init);
+      const text = await response.text();
 
       if (
         !response.ok &&
-        isTransient(
-          response.status,
-          text
-        )
+        isTransient(response.status, text)
       ) {
-        lastErr =
+        lastError =
           `HTTP ${response.status}: ${text.slice(0, 200)}`;
-
         continue;
       }
 
@@ -409,49 +219,42 @@ async function fetchWithRetry(
         return JSON.parse(text);
       } catch {
         throw new Error(
-          `malformed reply: ${text.slice(0, 200)}`
+          `Malformed network response: ${text.slice(0, 200)}`
         );
       }
     } catch (error) {
-      lastErr = String(error);
+      lastError = String(error);
     }
   }
 
   throw new Error(
-    `the network is briefly unreachable — please try again (${lastErr})`
+    `The network is briefly unreachable. Please try again. (${lastError})`
   );
 }
 
-export async function query(
+export async function queryRaw(
   method: string,
   argHex: string
 ): Promise<string> {
-  const response =
-    await fetchWithRetry(
-      `${BASE}/api/query`,
-      {
-        method: "POST",
-        headers: {
-          "content-type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          canister_id:
-            BACKEND_CANISTER_ID,
-          method,
-          arg: argHex,
-          sender:
-            demoSender(),
-        }),
-      }
-    );
+  const response = await fetchWithRetry(
+    `${BASE}/api/query`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        canister_id: BACKEND_CANISTER_ID,
+        method,
+        arg: argHex,
+        sender: demoSender(),
+      }),
+    }
+  );
 
-  if (
-    response.status !== "success"
-  ) {
+  if (response.status !== "success") {
     throw new Error(
-      response.error ||
-        "query failed"
+      response.error || `Query "${method}" failed`
     );
   }
 
@@ -464,330 +267,388 @@ async function submitCall(
   sender: string,
   nonce: number
 ): Promise<any> {
-  const response =
-    await fetch(
-      `${BASE}/api/call`,
-      {
-        method: "POST",
-        headers: {
-          "content-type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          canister_id:
-            BACKEND_CANISTER_ID,
-          method,
-          arg: argHex,
-          sender,
-          nonce,
-        }),
-      }
-    );
+  const response = await fetch(
+    `${BASE}/api/call`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        canister_id: BACKEND_CANISTER_ID,
+        method,
+        arg: argHex,
+        sender,
+        nonce,
+      }),
+    }
+  );
 
-  const text =
-    await response.text();
+  const text = await response.text();
 
   if (
     !response.ok &&
-    isTransient(
-      response.status,
-      text
-    )
+    isTransient(response.status, text)
   ) {
     throw new Error(
-      "the network is briefly unreachable — please try again"
+      "The network is briefly unreachable. Please try again."
     );
   }
 
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Malformed call response: ${text.slice(0, 200)}`
+    );
+  }
 }
 
-export async function call(
+export async function callRaw(
   method: string,
   argHex: string
 ): Promise<string> {
-  const sender =
-    demoSender();
+  const sender = demoSender();
 
-  const nonceResponse =
-    await fetchWithRetry(
-      `${BASE}/api/next_nonce?sender=${sender}`,
-      {
-        cache: "no-store",
-      }
-    );
+  const nonceReply = await fetchWithRetry(
+    `${BASE}/api/next_nonce?sender=${sender}`,
+    {
+      cache: "no-store",
+    }
+  );
 
-  if (
-    typeof nonceResponse.next_nonce !==
-    "number"
-  ) {
+  if (typeof nonceReply.next_nonce !== "number") {
     throw new Error(
-      "malformed next_nonce reply"
+      "Malformed next_nonce response"
     );
   }
 
-  let response =
-    await submitCall(
+  let result = await submitCall(
+    method,
+    argHex,
+    sender,
+    nonceReply.next_nonce
+  );
+
+  if (
+    !result.queued &&
+    typeof result.error === "string" &&
+    /nonce .* already used/i.test(result.error)
+  ) {
+    const match =
+      result.error.match(/last seen:\s*(\d+)/i);
+
+    const recoveredNonce = match
+      ? Number(match[1]) + 1
+      : nonceReply.next_nonce + 1;
+
+    result = await submitCall(
       method,
       argHex,
       sender,
-      nonceResponse.next_nonce
+      recoveredNonce
     );
-
-  if (
-    !response.queued &&
-    typeof response.error ===
-      "string" &&
-    /nonce .* already used/i.test(
-      response.error
-    )
-  ) {
-    const match =
-      response.error.match(
-        /last seen:\s*(\d+)/i
-      );
-
-    const recovered =
-      match
-        ? Number(match[1]) + 1
-        : nonceResponse.next_nonce + 1;
-
-    response =
-      await submitCall(
-        method,
-        argHex,
-        sender,
-        recovered
-      );
   }
 
-  if (
-    !response.queued ||
-    !response.message_hash
-  ) {
+  if (!result.queued || !result.message_hash) {
     throw new Error(
-      response.error ||
-        "call rejected"
+      result.error || `Call "${method}" was rejected`
     );
   }
 
-  return pollReceipt(
-    response.message_hash
-  );
+  return pollReceipt(result.message_hash);
 }
 
 async function pollReceipt(
   hashHex: string
 ): Promise<string> {
-  const deadline =
-    Date.now() + 30_000;
-
+  const deadline = Date.now() + 30_000;
   let transientPolls = 0;
 
-  while (
-    Date.now() < deadline
-  ) {
+  while (Date.now() < deadline) {
     try {
-      const response =
-        await fetchWithRetry(
-          `${BASE}/api/receipt?hash=${hashHex}`
-        );
+      const result = await fetchWithRetry(
+        `${BASE}/api/receipt?hash=${hashHex}`
+      );
 
-      if (response.found) {
-        if (
-          response.status ===
-          "success"
-        ) {
-          return response.reply || "";
+      if (result.found) {
+        if (result.status === "success") {
+          return result.reply || "";
         }
 
         throw new Error(
-          response.error ||
-            "call failed on chain"
+          result.error || "Call failed on chain"
         );
       }
     } catch (error) {
       transientPolls++;
 
-      if (
-        transientPolls > 10
-      ) {
+      if (transientPolls > 10) {
         throw error;
       }
     }
 
-    await new Promise(
-      (resolve) =>
-        setTimeout(resolve, 500)
+    await new Promise((resolve) =>
+      setTimeout(resolve, 500)
     );
   }
 
   throw new Error(
-    "timed out waiting for the chain's receipt"
+    "Timed out waiting for the chain's receipt"
   );
 }
 
-export async function add(
+export async function createNote(
+  sessionTokenHex: string,
   title: string,
-  content: string
-): Promise<bigint> {
-  const reply =
-    await call(
-      "add",
-      encodeAdd(
-        title,
-        content
-      )
-    );
+  body: string
+): Promise<Note> {
+  const reply = await callRaw(
+    "createNote",
+    encode(
+      [IDL.Vec(IDL.Nat8), IDL.Text, IDL.Text],
+      [sessionBlob(sessionTokenHex), title, body]
+    )
+  );
 
-  const decoded =
-function readCandidTypeTable(
-  buf: Uint8Array,
-  off: number,
-  count: bigint
-): bigint[] {
-  const table: bigint[] = [];
-
-  for (let i = 0n; i < count; i++) {
-    let type: bigint;
-    [type, off] = slebDecode(buf, off);
-
-    table.push(type);
-
-    /*
-     * A record type contains:
-     *
-     *   field count
-     *   field hash
-     *   field type
-     *
-     * Our Note record has 3 fields.
-     */
-    if (type === -20n) {
-      let fieldCount: bigint;
-      [fieldCount, off] = ulebDecode(buf, off);
-
-      for (let j = 0n; j < fieldCount; j++) {
-        let hash: bigint;
-        [hash, off] = ulebDecode(buf, off);
-
-        let fieldType: bigint;
-        [fieldType, off] = slebDecode(buf, off);
-
-        /*
-         * Field types in our Note are primitive text/nat,
-         * so no additional type-table data is needed.
-         */
-        void hash;
-        void fieldType;
-      }
-    }
-  }
-
-  return table;
-}   
-
- decodeReply(reply);
-
-  if (
-    typeof decoded !==
-    "bigint"
-  ) {
-    throw new Error(
-      "invalid add response"
-    );
-  }
-
-  return decoded;
+  return decodeNote(reply);
 }
 
-export async function edit(
+export async function listNotes(
+  sessionTokenHex: string
+): Promise<Note[]> {
+  const reply = await callRaw(
+    "listNotes",
+    encode(
+      [IDL.Vec(IDL.Nat8)],
+      [sessionBlob(sessionTokenHex)]
+    )
+  );
+
+  return decodeNotes(reply);
+}
+
+export async function updateNote(
+  sessionTokenHex: string,
   id: bigint,
   title: string,
-  content: string
+  body: string
 ): Promise<boolean> {
-  const reply =
-    await call(
-      "edit",
-      encodeEdit(
-        id,
-        title,
-        content
-      )
-    );
-
-  const decoded =
-    decodeReply(reply);
-
-  if (
-    typeof decoded !==
-    "boolean"
-  ) {
-    throw new Error(
-      "invalid edit response"
-    );
-  }
-
-  return decoded;
-}
-
-export async function remove(
-  id: bigint
-): Promise<boolean> {
-  const reply =
-    await call(
-      "remove",
-      encodeRemove(id)
-    );
-
-  const decoded =
-    decodeReply(reply);
-
-  if (
-    typeof decoded !==
-    "boolean"
-  ) {
-    throw new Error(
-      "invalid remove response"
-    );
-  }
-
-  return decoded;
-}
-
-export async function list(): Promise<Note[]> {
-  const reply =
-    await query(
-      "list",
-      encodeEmpty()
-    );
-
-  return decodeNoteList(reply);
-}
-
-function decodeNoteList(hex: string): Note[] {
-  const NoteIDL = IDL.Record({
-    content: IDL.Text,
-    id: IDL.Nat,
-    title: IDL.Text,
-  });
-
-  const ListIDL = IDL.Vec(NoteIDL);
-
-  const decoded = IDL.decode(
-    [ListIDL],
-    hexToBytes(hex)
+  const reply = await callRaw(
+    "updateNote",
+    encode(
+      [IDL.Vec(IDL.Nat8), IDL.Nat, IDL.Text, IDL.Text],
+      [sessionBlob(sessionTokenHex), id, title, body]
+    )
   );
 
-  const rawNotes = decoded[0] as Array<{
-    content: string;
-    id: bigint;
-    title: string;
-  }>;
+  return decodeBool(reply);
+}
 
-  return rawNotes.map((note) => ({
-    id: note.id,
-    title: note.title,
-    content: note.content,
+export async function deleteNote(
+  sessionTokenHex: string,
+  id: bigint
+): Promise<boolean> {
+  const reply = await callRaw(
+    "deleteNote",
+    encode(
+      [IDL.Vec(IDL.Nat8), IDL.Nat],
+      [sessionBlob(sessionTokenHex), id]
+    )
+  );
+
+  return decodeBool(reply);
+}
+
+// =========================================================
+// TASK 3 — SHARE, FEED AND POINTS LEDGER
+// =========================================================
+
+export async function shareNote(
+  sessionTokenHex: string,
+  id: bigint
+): Promise<boolean> {
+  const reply = await callRaw(
+    "shareNote",
+    encode(
+      [IDL.Vec(IDL.Nat8), IDL.Nat],
+      [sessionBlob(sessionTokenHex), id]
+    )
+  );
+
+  return decodeBool(reply);
+}
+
+export async function unshareNote(
+  sessionTokenHex: string,
+  id: bigint
+): Promise<boolean> {
+  const reply = await callRaw(
+    "unshareNote",
+    encode(
+      [IDL.Vec(IDL.Nat8), IDL.Nat],
+      [sessionBlob(sessionTokenHex), id]
+    )
+  );
+
+  return decodeBool(reply);
+}
+
+export async function feedView(): Promise<FeedNote[]> {
+  const reply = await queryRaw(
+    "feedView",
+    encodeEmpty()
+  );
+
+  const decoded = decode<
+    Array<{
+      id: bigint;
+      title: string;
+      body: string;
+      author: { toText(): string };
+    }>
+  >(
+    [IDL.Vec(FeedNoteIDL)],
+    reply
+  );
+
+  return decoded.map((item) => ({
+    id: item.id,
+    title: item.title,
+    body: item.body,
+    author: item.author.toText(),
   }));
+}
+
+export async function myBalance(
+  sessionTokenHex: string
+): Promise<bigint> {
+  const reply = await callRaw(
+    "myBalance",
+    encode(
+      [IDL.Vec(IDL.Nat8)],
+      [sessionBlob(sessionTokenHex)]
+    )
+  );
+
+  return decode<bigint>(
+    [IDL.Nat],
+    reply
+  );
+}
+
+export async function tip(
+  sessionTokenHex: string,
+  to: string,
+  amount: bigint
+): Promise<TipResult> {
+  const reply = await callRaw(
+    "tip",
+    encode(
+      [
+        IDL.Vec(IDL.Nat8),
+        IDL.Principal,
+        IDL.Nat,
+      ],
+      [
+        sessionBlob(sessionTokenHex),
+        Principal.fromText(to),
+        amount,
+      ]
+    )
+  );
+
+  return decode<TipResult>(
+    [TipResultIDL],
+    reply
+  );
+}
+
+export async function tipHistoryView(): Promise<TipRecord[]> {
+  const reply = await queryRaw(
+    "tipHistoryView",
+    encodeEmpty()
+  );
+
+  const decoded = decode<
+    Array<{
+      from: { toText(): string };
+      to: { toText(): string };
+      amount: bigint;
+      timestamp: bigint;
+    }>
+  >(
+    [IDL.Vec(TipRecordIDL)],
+    reply
+  );
+
+  return decoded.map((item) => ({
+    from: item.from.toText(),
+    to: item.to.toText(),
+    amount: item.amount,
+    timestamp: item.timestamp,
+  }));
+}
+
+export async function tokenMetadataView(): Promise<TokenMetadata> {
+  const reply = await queryRaw(
+    "tokenMetadataView",
+    encodeEmpty()
+  );
+
+  return decode<TokenMetadata>(
+    [TokenMetadataIDL],
+    reply
+  );
+}
+
+export async function ledgerSealView(): Promise<LedgerSeal> {
+  const reply = await queryRaw(
+    "ledgerSealView",
+    encodeEmpty()
+  );
+
+  return decode<LedgerSeal>(
+    [LedgerSealIDL],
+    reply
+  );
+}
+
+type MemphisPasskeyRuntime = {
+  issueScopedSession: (
+    sessionTokenHex: string,
+    origin: string
+  ) => Promise<{
+    scoped_token: Uint8Array;
+    scoped_token_hex: string;
+  }>;
+};
+
+export async function issueNotesScopedSession(
+  masterSessionTokenHex: string
+): Promise<string> {
+  const runtime = (
+    window as unknown as {
+      MemphisPasskey?: MemphisPasskeyRuntime;
+    }
+  ).MemphisPasskey;
+
+  if (!runtime?.issueScopedSession) {
+    throw new Error(
+      "Memphis scoped-session runtime is unavailable."
+    );
+  }
+
+  const result = await runtime.issueScopedSession(
+    masterSessionTokenHex,
+    window.location.origin
+  );
+
+  if (!result.scoped_token_hex) {
+    throw new Error(
+      "Memphis did not return a scoped session token."
+    );
+  }
+
+  return result.scoped_token_hex;
 }

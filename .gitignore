@@ -1,27 +1,33 @@
-# Frontend dependencies
-frontend/node_modules/
+# Dependencies
+**/node_modules/
 
-# Frontend build output
+# Build outputs
+build/
 frontend/dist/
-
-# Motoko package/cache
-.mops/
-
-# Backend build output
 backend/target/
 
-# Generic build outputs
-build/
-
-# Local identity material - never commit
-*.seed
-*.secret.json
+# Motoko local cache
+.mops/
 
 # Environment files
 .env
 .env.*
 !.env.example
 
-# Local backup files
+# Local identity / secret material
+*.seed
+*.secret.json
+
+# Temporary / backup files
 *.backup
-*.save
+*.bak
+*.task2-working
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local pre-task backups
+*.before-task2

@@ -1,4 +1,4 @@
-# notes-dapp
+# Note-d-app
 
 A smart-contract project on the **Thebes** substrate, scaffolded by
 `thebes-deploy new`.
